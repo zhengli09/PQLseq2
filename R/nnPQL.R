@@ -9,8 +9,8 @@
 #' @param lib_size q by n matrix of total read count
 #' @param k maximum number of nearest neighbors
 nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"), 
-  maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, nngp = TRUE, k = 10,
-  verbose = FALSE) 
+  maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, nngp = FALSE, k = 10,
+  outfile = NULL, verbose = FALSE)
 {
   # 1.check inputs
   model <- match.arg(model)
@@ -93,6 +93,12 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
   }
 
   # 6.run algorithm
+  header <- c("outcome", "n", "beta", "se_beta", "pvalue", "h2", "sigma2",
+    "converged", "elapsed_time")
+  if(!is.null(outfile)){
+    write.table(t(header), file = outfile, col.names = F, row.names = F,
+      quote = F, sep = ',')
+  }
   # 6.1.Binomial Mixed Model
   if(model == "BMM"){
     cat("# fitting binomial mixed model ... \n")
@@ -127,21 +133,36 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
       
       # fit model
       if(!any(covs_homo)){
-        res <- run_nnpql(Y[idx_keep, i], Wx, K[idx_keep, idx_keep], 
-          init_alpha_beta, model, maxIter, tol, lib_size[idx_keep, i],
-          nngp, nn_mtx, verbose)
-        beta <- res$beta
-        se_beta <- res$se_beta
-        pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
-        
-        output <- data.frame(n = res$n, beta = beta, se_beta = se_beta, 
-          pvalue = pvalue, h2 = res$h2, sigma2 = res$sigma2, 
-          converged = res$converged, time = res$elapsed_time)
+        res <- tryCatch({
+          Ks <- list(K[idx_keep, idx_keep], diag(length(idx_keep)))
+          run_nnpql(Y[idx_keep, i], Wx, Ks, init_alpha_beta, model, maxIter, 
+            tol, lib_size[idx_keep, i], nngp, nn_mtx, verbose)
+        }, error = function(e){
+          NA
+        })
+        if(is.list(res)){
+          beta <- res$beta
+          se_beta <- res$se_beta
+          pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
+          
+          output <- data.frame(outcome = colnames(Y)[i], n = res$n, beta = beta,
+            se_beta = se_beta, pvalue = pvalue, h2 = res$h2, sigma2 = res$sigma2,
+            converged = res$converged, elapsed_time = res$elapsed_time)
+        } else{
+          output <- c(colnames(Y)[i], rep(NA, 8))
+          output <- data.frame(t(output))
+          colnames(output) <- header
+          output
+        }
+
+        if(!is.null(outfile)){
+          write.table(output, file = outfile, col.names = F, row.names = F,
+            quote = F, sep = ',', append = T)
+        }
       }
       return(output)
     }, mc.cores = ncores)
     res <- do.call(rbind, res)
-    rownames(res) <- colnames(Y)
     res
   }
 }

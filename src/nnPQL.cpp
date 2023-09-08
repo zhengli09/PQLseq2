@@ -4,6 +4,7 @@
 
 #define ARMA_64BIT_WORD 1
 #include <RcppArmadillo.h>
+#include <float.h>
 using namespace Rcpp;
 using namespace arma;
 using namespace std;
@@ -23,7 +24,7 @@ private:
                   // total Bernoulli trials for Binomial models
     mat X;  // n by (c + 2) matrix (1, W, x) including
             // the intercept, covariates, and predictor
-    mat K; // sample relatedness matrix
+    field<mat> Ks; // sample relatedness/kernel matrices
     sp_mat nn_mtx; // nearest neighbor matrix
     vec offset;
   } dat;
@@ -31,8 +32,8 @@ private:
   struct Paras
   {
     vec alpha_beta; // (alpha^T, beta)^T
-    vec taus; // tau1 and tau2
     vec alpha_beta_prev; // parameter estimates at the previous iteration
+    vec taus; // tau1 and tau2
     vec taus_prev;
   } paras;
   
@@ -52,10 +53,12 @@ private:
   
   struct Control
   {
+    uvec est_idx; // whether to estimate or fix the parameters
     bool nngp; // whether to use the nearest neighbor Gaussian process
     int maxIter; // maximum iterations of the iterative algorithm
     double tol; // tolerance used to declare convergence
     bool is_converged;
+    bool is_failed;
   } control;
   
   // save time spent at each updating step
@@ -64,21 +67,21 @@ private:
     wall_clock timer;
     double prev_time = 0;
     double curr_time = 0;
-    vec elapsed_time;
+    vec step_time;
   } time;
   
-  int iter = 0;
+  int iter;
   
 public:
-  void load_data(const string model, const vec &y, const mat &X, const mat &K, 
-    const vec &lib_size, const sp_mat &nn_mtx)
+  void load_data(const string model, const vec &y, const mat &X, 
+    const field<mat> &Ks, const vec &lib_size, const sp_mat &nn_mtx)
   {
     dat.model = model;
     dat.y = y;
     dat.X = X;
     dat.n = dat.X.n_rows;
     dat.c = dat.X.n_cols - 2; // exclude intercept and predictor
-    dat.K = K;
+    dat.Ks = Ks;
     dat.lib_size = lib_size;
     dat.nn_mtx = nn_mtx;
     if(dat.model == "PMM")
@@ -99,21 +102,48 @@ public:
     control.is_converged = false;
   }
   
-  void init_paras(const vec &init_alpha_beta)
+  void set_control(const uvec est_idx)
+  {
+    control.est_idx = est_idx;
+  }
+  
+  void init_paras(const vec &init_alpha_beta, const vec &init_taus)
   {
     paras.alpha_beta = init_alpha_beta;
+    paras.taus = init_taus;
     // initialize eta without random effects
     alg.eta = dat.X * paras.alpha_beta + dat.offset;
     update_d();
     update_y_tilde();
-    paras.taus = ones(2) * min(0.9, var(alg.y_tilde) / 2.0);
-    time.elapsed_time = vec(8, fill::zeros);
+    // further initialize taus
+    paras.taus(control.est_idx) = min(0.9, var(alg.y_tilde) / 
+      control.est_idx.n_elem) * ones(control.est_idx.n_elem);
+    update_H(control.nngp);
+    update_P();
+    vec Py_tilde = alg.P * alg.y_tilde;
+    for(int i = 0; i < control.est_idx.n_elem; i++)
+    {
+      int l = control.est_idx(i);
+      paras.taus(l) += (accu(Py_tilde % (dat.Ks(l) * Py_tilde)) - 
+        accu(alg.P % dat.Ks(l))) * paras.taus(l) * paras.taus(l);
+      paras.taus(l) = max(0.0, paras.taus(l) / dat.n);
+    }
+    time.step_time = vec(7, fill::zeros);
+    iter = 0;
   }
   
   void update_eta()
   {
-    alg.eta = alg.y_tilde - alg.Hinv * (alg.y_tilde - 
-      dat.X * paras.alpha_beta) / alg.d + dat.offset;  
+    alg.eta = alg.y_tilde - (alg.Hinv * (alg.y_tilde - 
+      dat.X * paras.alpha_beta)) / alg.d + dat.offset;
+    // follow glm family$mu.eta function to handle edge cases
+    for(int i = 0; i < dat.n; i++)
+    {
+      if(alg.eta(i) < -30 || alg.eta(i) > 30)
+      {
+        alg.eta(i) = DBL_EPSILON;
+      }
+    }
   }
   
   void update_d()
@@ -139,32 +169,42 @@ public:
   {
     if(nngp)
     {
-      uvec idx_nbr; // neighbors indeces of each sample
+      uvec idx_nbr; // neighbors indexes of each sample
       uvec idx_i(1);
-      vec k_Nii; // K_{N(i), i}
+      double k_ii;
+      vec K_Nii; // K_{N(i), i}
       mat K_NiNi; // K_{N(i), i}
+      mat K_NiNi_inv;
       double fii;
       vec bi;
-      
+
       alg.Hinv = mat(dat.n, dat.n, fill::zeros);
-      alg.Hinv(0,0) = 1.0 / (paras.taus(0) * dat.K(0,0) + paras.taus(1) + 
-        1.0 / alg.d(0));
+      for(int i = 0; i < control.est_idx.n_elem; i++)
+      {
+        int l = control.est_idx(i);
+        alg.Hinv(0,0) += paras.taus(l) * dat.Ks(l)(0,0);
+      }
+      alg.Hinv(0,0) = 1.0 / (1.0 / alg.d(0) + alg.Hinv(0,0));
       for(int i = 1; i < dat.n; i++)
       {
         idx_i(0) = i;
         idx_nbr = find(dat.nn_mtx.row(i));
-        k_Nii = dat.K(idx_nbr, idx_i);
-        K_NiNi = dat.K(idx_nbr, idx_nbr);
-        
-        mat temp = paras.taus(0) * K_NiNi;
-        temp.diag() += paras.taus(1) + 1.0 / alg.d(idx_nbr);
-        temp = inv(temp);
-        
-        fii = paras.taus(0) * dat.K(i,i) + paras.taus(1) + 1.0 / alg.d(i);
-        fii -= as_scalar(k_Nii.t() * temp  * k_Nii) * paras.taus(0) * 
-          paras.taus(0);
-        bi = paras.taus(0) * temp * k_Nii;
-        
+        k_ii = 1.0 / alg.d(i);
+        K_Nii = vec(idx_nbr.n_elem, fill::zeros);
+        K_NiNi = mat(idx_nbr.n_elem, idx_nbr.n_elem, fill::zeros);
+        K_NiNi.diag() = 1.0 / alg.d(idx_nbr);
+        for(int j = 0; j < control.est_idx.n_elem; j++)
+        {
+          int l = control.est_idx(j);
+          k_ii += paras.taus(l) * dat.Ks(l)(i,i);
+          K_Nii += paras.taus(l) * dat.Ks(l)(idx_nbr, idx_i);
+          K_NiNi += paras.taus(l) * dat.Ks(l)(idx_nbr, idx_nbr);
+        }
+        K_NiNi_inv = inv(K_NiNi);
+
+        fii = as_scalar(k_ii - K_Nii.t() * K_NiNi_inv * K_Nii);
+        bi = K_NiNi_inv * K_Nii;
+
         alg.Hinv(idx_nbr, idx_nbr) += bi * bi.t() / fii;
         alg.Hinv(i,i) += 1.0 / fii;
         alg.Hinv(idx_i, idx_nbr) -= bi.t() / fii;
@@ -173,8 +213,12 @@ public:
     }
     else
     {
-      alg.H = paras.taus(0) * dat.K;
-      alg.H.diag() += 1.0 / alg.d + paras.taus(1);
+      alg.H = diagmat(1.0 / alg.d);
+      for(int i = 0; i < control.est_idx.n_elem; i++)
+      {
+        int l = control.est_idx(i);
+        alg.H += paras.taus(l) * dat.Ks(l);
+      }
       mat I = eye(dat.n, dat.n);
       alg.Hinv = solve(alg.H, I);
     }
@@ -197,29 +241,47 @@ public:
   void update_taus()
   {
     paras.taus_prev = paras.taus;
-    vec scores(paras.taus.n_elem);
-    mat AI(paras.taus.n_elem, paras.taus.n_elem);
+    vec scores(control.est_idx.n_elem);
+    mat AI(control.est_idx.n_elem, control.est_idx.n_elem);
     
     vec Py_tilde = alg.P * alg.y_tilde;
-    vec PKPy_tilde = alg.P * dat.K * Py_tilde;
-    mat PPy_tilde = alg.P * Py_tilde;
-    AI(0,0) = accu(Py_tilde % (dat.K * PKPy_tilde));
-    AI(1,1) = accu(Py_tilde % PPy_tilde);
-    AI(0,1) = accu(PKPy_tilde % Py_tilde);
-    AI(1,0) = AI(0,1);
-    scores(0) = accu(PKPy_tilde % alg.y_tilde) - accu(alg.P % dat.K);
-    scores(1) = accu(PPy_tilde % alg.y_tilde) - accu(alg.P.diag());
-    scores /= 2.0;
+    for(int i = 0; i < control.est_idx.n_elem; i++)
+    {
+      int l = control.est_idx(i);
+      vec KlPy_tilde = dat.Ks(l) * Py_tilde;
+      scores(i) = accu(Py_tilde % KlPy_tilde) - accu(alg.P % dat.Ks(l));
+      for(int j = 0; j <= i; j++)
+      {
+        int m = control.est_idx(j);
+        vec KmPy_tilde = dat.Ks(m) * Py_tilde;
+        AI(i,j) = accu(KlPy_tilde % (alg.P * KmPy_tilde));
+        if(i != j)
+        {
+          AI(j,i) = AI(i,j);
+        }
+      }
+    }
+    paras.taus(control.est_idx) += solve(AI, scores);
     
-    AI.diag() += 0.01; // to encourage positive definiteness
-    paras.taus += solve(AI, scores);
+    // handle tau less than zero case
+    paras.taus.elem(find((paras.taus_prev < control.tol) %
+      (paras.taus < control.tol))).zeros();
+    double step = 1.0;
+    while(any(paras.taus < 0.0))
+    {
+      step *= 0.5;
+      paras.taus(control.est_idx) = step * solve(AI, scores) +
+        paras.taus_prev(control.est_idx);
+      paras.taus.elem(find((paras.taus_prev < control.tol) %
+        (paras.taus < control.tol))).zeros();
+    }
     paras.taus.elem(find(paras.taus < 0)).zeros();
   }
   
   void record_time(int i_step)
   {
     time.curr_time = time.timer.toc();
-    time.elapsed_time(i_step) += time.curr_time - time.prev_time;
+    time.step_time(i_step) += time.curr_time - time.prev_time;
     time.prev_time = time.curr_time;
   }
   
@@ -230,6 +292,11 @@ public:
     double diff2 = max(abs(paras.taus - paras.taus_prev) / 
       (abs(paras.taus) + abs(paras.taus_prev) + control.tol));
     control.is_converged = (2 * max(diff1, diff2)) < control.tol;
+  }
+  
+  void check_anomaly()
+  {
+    control.is_failed = max(paras.taus) > (1.0 / control.tol / control.tol);
   }
   
   void run(bool verbose)
@@ -247,17 +314,17 @@ public:
       record_time(1);
       update_alpha_beta();
       record_time(2);
-      update_taus();
-      record_time(3);
       update_eta();
+      record_time(3);
+      update_taus();
       record_time(4);
       update_d();
       record_time(5);
       update_y_tilde();
       record_time(6);
       check_converge();
-      record_time(7);
-      if(control.is_converged)
+      check_anomaly();
+      if(control.is_converged || control.is_failed)
       {
         break;
       }
@@ -270,6 +337,7 @@ public:
     List output;
     output = List::create(
       _["n"] = dat.n,
+      _["taus"] = paras.taus,
       _["tau1"] = paras.taus(0),
       _["tau2"] = paras.taus(1),
       _["h2"] = paras.taus(0) / sum(paras.taus),
@@ -279,7 +347,7 @@ public:
       _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
       _["converged"] = control.is_converged,
       _["niter"] = iter,
-      _["elapsed_time"] = time.elapsed_time
+      _["step_time"] = time.step_time
     );
     return output;
   }
@@ -287,21 +355,37 @@ public:
 
 
 // [[Rcpp::export]]
-List run_nnpql(const arma::vec &y, const arma::mat &X, const arma::mat &K,
-  const arma::vec &init_alpha_beta, const std::string model, const int maxIter, 
-  const double tol, const arma::vec &lib_size, const bool nngp, 
-  const arma::sp_mat &nn_mtx, const bool verbose)
+List run_nnpql(const arma::vec &y, const arma::mat &X, 
+  const arma::field<arma::mat> &Ks, const arma::vec &init_alpha_beta, 
+  const std::string model, const int maxIter, const double tol, 
+  const arma::vec &lib_size, const bool nngp, const arma::sp_mat &nn_mtx, 
+  const bool verbose)
 {
   wall_clock timer;
   timer.tic();
+  List output;
+  uvec est_idx_curr;
+  uvec est_idx_prev;
+  vec init_taus;
+  
+  est_idx_curr = regspace<uvec>(0, Ks.n_elem-1);
+  init_taus = vec(Ks.n_elem, fill::zeros);
+  
   nnPQL nnpql_model;
-  
-  nnpql_model.load_data(model, y, X, K, lib_size, nn_mtx);
+  nnpql_model.load_data(model, y, X, Ks, lib_size, nn_mtx);
   nnpql_model.set_control(nngp, maxIter, tol);
-  nnpql_model.init_paras(init_alpha_beta);
-  nnpql_model.run(verbose);
-  
-  List output = nnpql_model.get_output();
+  do
+  {
+    nnpql_model.set_control(est_idx_curr);
+    nnpql_model.init_paras(init_alpha_beta, init_taus);
+    nnpql_model.run(verbose);
+    output = nnpql_model.get_output();
+    init_taus = as<vec>(output["taus"]);
+    est_idx_prev = est_idx_curr;
+    est_idx_curr = find(init_taus > tol);
+  } while(est_idx_curr.n_elem != est_idx_prev.n_elem || 
+    any(est_idx_curr != est_idx_prev));
+
   double elapsed = timer.toc();
   output.push_back(elapsed, "elapsed_time");
   return output;

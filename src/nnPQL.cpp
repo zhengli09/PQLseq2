@@ -26,6 +26,7 @@ private:
             // the intercept, covariates, and predictor
     field<mat> Ks; // sample relatedness/kernel matrices
     sp_mat nn_mtx; // nearest neighbor matrix
+    mat In; // n by n identity matrix
     vec offset;
   } dat;
   
@@ -61,6 +62,11 @@ private:
     bool is_failed;
   } control;
   
+  struct IntEst
+  {
+    mat taus;
+  } int_est;
+  
   // save time spent at each updating step
   struct Time
   {
@@ -71,6 +77,7 @@ private:
   } time;
   
   int iter;
+  double step_size;
   
 public:
   void load_data(const string model, const vec &y, const mat &X, 
@@ -92,6 +99,7 @@ public:
     {
       dat.offset = zeros(dat.n);
     }
+    dat.In = eye(dat.n, dat.n);
   }
   
   void set_control(const bool nngp, const int maxIter, const double tol)
@@ -100,11 +108,22 @@ public:
     control.maxIter = maxIter;
     control.tol = tol;
     control.is_converged = false;
+    control.is_failed = false;
   }
   
   void set_control(const uvec est_idx)
   {
     control.est_idx = est_idx;
+    control.is_converged = false;
+    control.is_failed = false;
+  }
+  
+  void update_step_size()
+  {
+    if((iter+1) % 10 == 0)
+    {
+      step_size = 0.9 * step_size;
+    }
   }
   
   void init_paras(const vec &init_alpha_beta, const vec &init_taus)
@@ -130,6 +149,12 @@ public:
     }
     time.step_time = vec(7, fill::zeros);
     iter = 0;
+    step_size = 1;
+  }
+  
+  void init_int_est()
+  {
+    int_est.taus.zeros(paras.taus.n_elem, control.maxIter);
   }
   
   void update_eta()
@@ -219,8 +244,7 @@ public:
         int l = control.est_idx(i);
         alg.H += paras.taus(l) * dat.Ks(l);
       }
-      mat I = eye(dat.n, dat.n);
-      alg.Hinv = solve(alg.H, I);
+      alg.Hinv = solve(alg.H, dat.In);
     }
   }
   
@@ -261,21 +285,21 @@ public:
         }
       }
     }
-    paras.taus(control.est_idx) += solve(AI, scores);
+    paras.taus(control.est_idx) += step_size * solve(AI, scores);
     
     // handle tau less than zero case
     paras.taus.elem(find((paras.taus_prev < control.tol) %
       (paras.taus < control.tol))).zeros();
-    double step = 1.0;
+    double ss = step_size;
     while(any(paras.taus < 0.0))
     {
-      step *= 0.5;
-      paras.taus(control.est_idx) = step * solve(AI, scores) +
+      ss = ss * 0.5;
+      paras.taus(control.est_idx) = ss * solve(AI, scores) +
         paras.taus_prev(control.est_idx);
       paras.taus.elem(find((paras.taus_prev < control.tol) %
         (paras.taus < control.tol))).zeros();
     }
-    paras.taus.elem(find(paras.taus < 0)).zeros();
+    int_est.taus.col(iter) = paras.taus;
   }
   
   void record_time(int i_step)
@@ -296,7 +320,15 @@ public:
   
   void check_anomaly()
   {
-    control.is_failed = max(paras.taus) > (1.0 / control.tol / control.tol);
+    if(iter >= 9)
+    {
+      vec check_zeros =  sum(int_est.taus.cols(iter-9,iter), 1);
+      int n_zeros = accu(check_zeros == 0);
+      if(n_zeros > 0 && n_zeros < control.est_idx.n_elem)
+      {
+        control.is_failed = true;
+      }
+    }
   }
   
   void run(bool verbose)
@@ -328,6 +360,7 @@ public:
       {
         break;
       }
+      update_step_size();
       iter += 1;
     }
   }
@@ -378,6 +411,7 @@ List run_nnpql(const arma::vec &y, const arma::mat &X,
   {
     nnpql_model.set_control(est_idx_curr);
     nnpql_model.init_paras(init_alpha_beta, init_taus);
+    nnpql_model.init_int_est();
     nnpql_model.run(verbose);
     output = nnpql_model.get_output();
     init_taus = as<vec>(output["taus"]);

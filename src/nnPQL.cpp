@@ -299,6 +299,7 @@ public:
       paras.taus.elem(find((paras.taus_prev < control.tol) %
         (paras.taus < control.tol))).zeros();
     }
+    paras.taus.elem(find(paras.taus < control.tol)).zeros();
     int_est.taus.col(iter) = paras.taus;
   }
   
@@ -392,7 +393,7 @@ List run_nnpql(const arma::vec &y, const arma::mat &X,
   const arma::field<arma::mat> &Ks, const arma::vec &init_alpha_beta, 
   const std::string model, const int maxIter, const double tol, 
   const arma::vec &lib_size, const bool nngp, const arma::sp_mat &nn_mtx, 
-  const bool verbose)
+  const bool fix_h2eq1, const bool verbose)
 {
   wall_clock timer;
   timer.tic();
@@ -402,6 +403,10 @@ List run_nnpql(const arma::vec &y, const arma::mat &X,
   vec init_taus;
   
   est_idx_curr = regspace<uvec>(0, Ks.n_elem-1);
+  if(fix_h2eq1)
+  {
+    est_idx_curr = est_idx_curr.subvec(0, Ks.n_elem-2);
+  }
   init_taus = vec(Ks.n_elem, fill::zeros);
   
   nnPQL nnpql_model;

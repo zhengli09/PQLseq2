@@ -10,7 +10,7 @@
 #' @param k maximum number of nearest neighbors
 nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"), 
   maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, nngp = FALSE, k = 10,
-  outfile = NULL, verbose = FALSE)
+  fix_h2eq1 = FALSE, outfile = NULL, verbose = FALSE)
 {
   # 1.check inputs
   model <- match.arg(model)
@@ -136,8 +136,9 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
         res <- tryCatch({
           Ks <- list(K[idx_keep, idx_keep], diag(length(idx_keep)))
           run_nnpql(Y[idx_keep, i], Wx, Ks, init_alpha_beta, model, maxIter, 
-            tol, lib_size[idx_keep, i], nngp, nn_mtx, verbose)
+            tol, lib_size[idx_keep, i], nngp, nn_mtx, fix_h2eq1, verbose)
         }, error = function(e){
+          print(e)
           NA
         })
         if(is.list(res)){

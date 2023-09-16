@@ -2,7 +2,6 @@
 // Date: 2023-07-28
 // Poisson/Binomial mixed model using nearest neighbor Gaussian process
 
-#define ARMA_64BIT_WORD 1
 #include <RcppArmadillo.h>
 #include <float.h>
 using namespace Rcpp;
@@ -427,7 +426,7 @@ List run_nnpql(const arma::vec &y, const arma::mat &X,
     init_taus = as<vec>(output["taus"]);
     est_idx_prev = est_idx_curr;
     est_idx_curr = find(init_taus > tol);
-  } while(est_idx_curr.n_elem != est_idx_prev.n_elem || 
+  } while(est_idx_curr.n_elem != est_idx_prev.n_elem ||
     any(est_idx_curr != est_idx_prev));
 
   double elapsed = timer.toc();

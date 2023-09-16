@@ -1,0 +1,22 @@
+Type: Package
+Package: nnPQL
+Title: Poisson and Binomial linear mixed model
+Version: 0.1.0
+Date: 2023-07-28
+Author: Zheng Li, Xiang Zhou
+Maintainer: Zheng Li <zlisph@umich.edu>
+Description: Poisson and Binomial linear mixed model
+License: GPL (>= 3)
+Imports: 
+    Matrix (>= 1.5.3),
+    parallel (>= 4.3.1),
+    pbmcapply (>= 1.5.1),
+    Rcpp (>= 1.0.10),
+    RcppArmadillo (>= 0.12.0.1.0)
+Suggests: 
+    tinytest
+LinkingTo: 
+    Rcpp,
+    RcppArmadillo
+Encoding: UTF-8
+RoxygenNote: 7.2.3

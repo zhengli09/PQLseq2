@@ -2,15 +2,30 @@
 # Date: 2023-08-12
 # Poisson/Binomial mixed model using nearest neighbor Gaussian process
 
+#' Poisson/Binomial linear mixed model
+#'
 #' @param Y q by n count matrix for q genes/sites and n individuals 
 #' @param x n by 1 vector of the predicting variable
 #' @param K n by n relatedness matrix 
 #' @param W n by c matrix of covariates for n individuals and c covariates
 #' @param lib_size q by n matrix of total read count
-#' @param k maximum number of nearest neighbors
+#' @param model either "PMM" for poisson model or "BMM" for binomial model
+#' @param maxIter maximum number of iterations for fitting the model
+#' @param tol a threshold parameter to declare convergence
+#' @param ncores number of cpus to use for parallel computing
+#' @param filter whether to filter out genes that do not at least have two
+#'   individuals having read counts greater than 5
+#' @param check_K whether to check if the relatedness matrix K is positive
+#'   definite or not and map it to the nearest PD matrix if not.
+#' @param nngp whether to use NNGP to invert the H matrix
+#' @param k maximum number of nearest neighbors used in NNGP
+#' @param fix_h2eq1 whether to fix h2 to be 1
+#' @param outfile also output results to a file on the disk if specified
+#' @param verbose whether to print intermediate information for testing
+#' @export
 nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"), 
-  maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, nngp = FALSE, k = 10,
-  fix_h2eq1 = FALSE, outfile = NULL, verbose = FALSE)
+  maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, check_K = FALSE, 
+  nngp = FALSE, k = 10, fix_h2eq1 = FALSE, outfile = NULL, verbose = FALSE)
 {
   # 1.check inputs
   model <- match.arg(model)
@@ -67,11 +82,14 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
   
   # 4.process the sample relatedness matrix
   K <- as.matrix(K)
-  eigvals <- eigen(K, only.values = TRUE)$values
-  if(any(eigvals < 1e-10)){ 
-    warning(paste("K is singular, approximate K with its",
-      "nearest positive definite matrix"))
-    K <- as.matrix(Matrix::nearPD(K, corr = TRUE)$mat)	
+  if(check_K)
+  {
+    eigvals <- eigen(K, only.values = TRUE)$values
+    if(any(eigvals < 1e-10)){ 
+      warning(paste("K is singular, approximate K with its",
+        "nearest positive definite matrix"))
+      K <- as.matrix(Matrix::nearPD(K, corr = TRUE)$mat)	
+    }  
   }
   
   # 5.construct a adjacency matrix for NNGP
@@ -141,29 +159,49 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
           print(e)
           NA
         })
+        
+        # organized results into an output object
         if(is.list(res)){
           beta <- res$beta
           se_beta <- res$se_beta
           pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
           
-          output <- data.frame(outcome = colnames(Y)[i], n = res$n, beta = beta,
+          ests <- data.frame(outcome = colnames(Y)[i], n = res$n, beta = beta,
             se_beta = se_beta, pvalue = pvalue, h2 = res$h2, sigma2 = res$sigma2,
             converged = res$converged, elapsed_time = res$elapsed_time)
+          if(verbose){
+            others <- list(alpha = res$alpha, u = res$u, eta = res$eta, 
+              mu = res$mu, H = res$H)
+          }
         } else{
-          output <- c(colnames(Y)[i], rep(NA, 8))
-          output <- data.frame(t(output))
-          colnames(output) <- header
-          output
+          ests <- c(colnames(Y)[i], rep(NA, 8))
+          ests <- data.frame(t(ests))
+          colnames(ests) <- header
+          others <- list()
+        }
+        
+        if(verbose){
+          output <- list(estimates = ests, others = others)
+        } else{
+          output <- ests
         }
 
         if(!is.null(outfile)){
-          write.table(output, file = outfile, col.names = F, row.names = F,
+          write.table(ests, file = outfile, col.names = F, row.names = F, 
             quote = F, sep = ',', append = T)
         }
       }
       return(output)
     }, mc.cores = ncores)
-    res <- do.call(rbind, res)
+    
+    if(verbose){
+      res_ests <- do.call(rbind, lapply(res, `[[`, "estimates"))
+      res_othrs <- lapply(res, `[[`, "others")
+      names(res_othrs) <- res_ests$outcome
+      res <- new(Class = "output", estimates = res_ests, others = res_othrs)
+    } else{
+      res <- do.call(rbind, res)
+    }
     res
   }
 }
@@ -181,4 +219,10 @@ const_nnMtx <- function(K, k)
   nn_mtx[1, 1] <- 0
   return(nn_mtx)  
 }
+
+
+setClass("output", slots = list(
+  estimates = "data.frame",
+  others = "list"  
+))
 

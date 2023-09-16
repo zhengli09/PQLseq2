@@ -369,6 +369,7 @@ public:
   List get_output()
   {
     List output;
+    vec u = alg.eta - dat.X * paras.alpha_beta;
     output = List::create(
       _["n"] = dat.n,
       _["taus"] = paras.taus,
@@ -381,7 +382,11 @@ public:
       _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
       _["converged"] = control.is_converged,
       _["niter"] = iter,
-      _["step_time"] = time.step_time
+      _["step_time"] = time.step_time,
+      _["u"] = u,
+      _["eta"] = alg.eta,
+      _["mu"] = alg.mu,
+      _["H"] = alg.H
     );
     return output;
   }

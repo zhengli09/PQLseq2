@@ -365,32 +365,55 @@ public:
     }
   }
   
-  List get_output()
+  List get_output(bool verbose)
   {
     List output;
     vec u = alg.eta - dat.X * paras.alpha_beta;
-    output = List::create(
-      _["n"] = dat.n,
-      _["taus"] = paras.taus,
-      _["tau1"] = paras.taus(0),
-      _["tau2"] = paras.taus(1),
-      _["h2"] = paras.taus(0) / sum(paras.taus),
-      _["sigma2"] = sum(paras.taus),
-      _["intercept"] = paras.alpha_beta(0),
-      _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
-      _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
-      _["beta"] = paras.alpha_beta.tail(1),
-      _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
-      _["converged"] = control.is_converged,
-      _["niter"] = iter,
-      _["u"] = u,
-      _["eta"] = alg.eta,
-      _["mu"] = alg.mu,
-      _["H"] = alg.H,
-      _["P"] = alg.P,
-      _["cov"] = alg.XtHinvX_inv,
-      _["d"] = alg.d
-    );
+    if(verbose)
+    {
+      output = List::create(
+        _["n"] = dat.n,
+        _["taus"] = paras.taus,
+        _["tau1"] = paras.taus(0),
+        _["tau2"] = paras.taus(1),
+        _["h2"] = paras.taus(0) / sum(paras.taus),
+        _["sigma2"] = sum(paras.taus),
+        _["intercept"] = paras.alpha_beta(0),
+        _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
+        _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
+        _["beta"] = paras.alpha_beta.tail(1),
+        _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
+        _["converged"] = control.is_converged,
+        _["niter"] = iter,
+        _["u"] = u,
+        _["eta"] = alg.eta,
+        _["mu"] = alg.mu,
+        _["H"] = alg.H,
+        _["P"] = alg.P,
+        _["cov"] = alg.XtHinvX_inv,
+        _["d"] = alg.d
+      );
+    }
+    else
+    {
+      output = List::create(
+        _["n"] = dat.n,
+        _["taus"] = paras.taus,
+        _["tau1"] = paras.taus(0),
+        _["tau2"] = paras.taus(1),
+        _["h2"] = paras.taus(0) / sum(paras.taus),
+        _["sigma2"] = sum(paras.taus),
+        _["intercept"] = paras.alpha_beta(0),
+        _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
+        _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
+        _["beta"] = paras.alpha_beta.tail(1),
+        _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
+        _["converged"] = control.is_converged,
+        _["step_time"] = time.step_time,
+        _["u"] = u
+      );
+    }
+
     return output;
   }
 };
@@ -426,7 +449,7 @@ List run_nnpql(const arma::vec &y, const arma::mat &X,
     nnpql_model.init_paras(init_alpha_beta, init_taus);
     nnpql_model.init_int_est();
     nnpql_model.run(verbose);
-    output = nnpql_model.get_output();
+    output = nnpql_model.get_output(verbose);
     init_taus = as<vec>(output["taus"]);
     est_idx_prev = est_idx_curr;
     est_idx_curr = find(init_taus > tol);

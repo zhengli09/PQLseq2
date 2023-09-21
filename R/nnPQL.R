@@ -166,12 +166,22 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
           se_beta <- res$se_beta
           pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
           
-          ests <- data.frame(outcome = colnames(Y)[i], n = res$n, beta = beta,
-            se_beta = se_beta, pvalue = pvalue, h2 = res$h2, sigma2 = res$sigma2,
-            converged = res$converged, elapsed_time = res$elapsed_time)
+          ests <- data.frame(outcome = colnames(Y)[i], n = res$n, 
+            intercept = res$intercept, se_intercept = res$se_intercept,
+            beta = beta, se_beta = se_beta, pvalue = pvalue, h2 = res$h2, 
+            sigma2 = res$sigma2, converged = res$converged, 
+            elapsed_time = res$elapsed_time)
           if(verbose){
-            others <- list(alpha = res$alpha, u = res$u, eta = res$eta, 
-              mu = res$mu, H = res$H)
+            others <- list(taus = res$taus, P = res$P, cov = res$cov, 
+              alpha = res$alpha, eta = res$eta, H = res$H, 
+              intercept = res$intercept, se_intercept = res$se_intercept,
+              beta = res$beta, se_beta = res$se_beta, pvalue = pvalue, 
+              tau1 = res$tau1, tau2 = res$tau2, sigma2 = res$sigma2, 
+              h2 = res$h2, iter = res$niter, mu = res$mu, Y = Y, 
+              y = Y[idx_keep, i], res = Y[idx_keep, i] - res$mu,
+              converged = res$converged, X = Wx, K = K, 
+              V = res$tau1 * Ks[[1]] + res$tau2 *Ks[[2]], D = diag(res$d[, 1]), 
+              family = mod0$family, numTotal = lib_size[idx_keep, i])
           }
         } else{
           ests <- c(colnames(Y)[i], rep(NA, 8))

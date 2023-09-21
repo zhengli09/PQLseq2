@@ -376,16 +376,20 @@ public:
       _["tau2"] = paras.taus(1),
       _["h2"] = paras.taus(0) / sum(paras.taus),
       _["sigma2"] = sum(paras.taus),
+      _["intercept"] = paras.alpha_beta(0),
+      _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
       _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
       _["beta"] = paras.alpha_beta.tail(1),
       _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
       _["converged"] = control.is_converged,
       _["niter"] = iter,
-      _["step_time"] = time.step_time,
       _["u"] = u,
       _["eta"] = alg.eta,
       _["mu"] = alg.mu,
-      _["H"] = alg.H
+      _["H"] = alg.H,
+      _["P"] = alg.P,
+      _["cov"] = alg.XtHinvX_inv,
+      _["d"] = alg.d
     );
     return output;
   }

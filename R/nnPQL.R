@@ -181,7 +181,8 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
               y = Y[idx_keep, i], res = Y[idx_keep, i] - res$mu,
               converged = res$converged, X = Wx, K = K, 
               V = res$tau1 * Ks[[1]] + res$tau2 *Ks[[2]], D = diag(res$d[, 1]), 
-              family = mod0$family, numTotal = lib_size[idx_keep, i])
+              family = mod0$family, numTotal = lib_size[idx_keep, i],
+              u = res$u)
           }
         } else{
           ests <- c(colnames(Y)[i], rep(NA, 8))

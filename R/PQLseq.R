@@ -1,6 +1,6 @@
 # Author: Zheng Li
 # Date: 2023-08-12
-# Poisson/Binomial mixed model using nearest neighbor Gaussian process
+# A faster re-implementation of the Poisson/Binomial mixed model
 
 #' Poisson/Binomial linear mixed model
 #'
@@ -13,17 +13,32 @@
 #' @param maxIter maximum number of iterations for fitting the model
 #' @param tol a threshold parameter to declare convergence
 #' @param ncores number of cpus to use for parallel computing
-#' @param filter whether to filter out genes that do not at least have two
+#' @param filter whether to filter out genes that do not have at least two
 #'   individuals having read counts greater than 5
 #' @param check_K whether to check if the relatedness matrix K is positive
 #'   definite or not and map it to the nearest PD matrix if not.
-#' @param nngp whether to use NNGP to invert the H matrix
+#' @param nngp whether to use NNGP to invert the H matrix (under testing)
 #' @param k maximum number of nearest neighbors used in NNGP
 #' @param fix_h2eq1 whether to fix h2 to be 1
 #' @param outfile also output results to a file on the disk if specified
 #' @param verbose whether to print intermediate information for testing
+#' 
+#' @return \code{pqlseq2} returns a data frame where each row stores results
+#' for a gene/site. The results include:
+#' \item{outcome}{name of the analyzed gene/site}
+#' \item{n}{number of individuals}
+#' \item{intercept}{intercept estimate}
+#' \item{se_intercept}{standard error of the intercept estimate}
+#' \item{beta}{fixed effect estimate for the predicting variable of interest}
+#' \item{se_beta}{standard error of the beta estimate}
+#' \item{pvalue}{Wald test p value for testing H0:beta = 0}
+#' \item{h2}{heritability estimate}
+#' \item{sigma2}{total variance component}
+#' \item{converged}{whether the algorithm converged}
+#' \item{elapsed_time}{time (seconds) for analyzing the gene/site}
+#' 
 #' @export
-nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"), 
+pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"), 
   maxIter = 500, tol = 1e-5, ncores = 1, filter = TRUE, check_K = FALSE, 
   nngp = FALSE, k = 10, fix_h2eq1 = FALSE, outfile = NULL, verbose = FALSE)
 {
@@ -88,8 +103,8 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
     if(any(eigvals < 1e-10)){ 
       warning(paste("K is singular, approximate K with its",
         "nearest positive definite matrix"))
-      K <- as.matrix(Matrix::nearPD(K, corr = TRUE)$mat)	
-    }  
+      K <- as.matrix(Matrix::nearPD(K, doSym = TRUE)$mat)	
+    } 
   }
   
   # 5.construct a adjacency matrix for NNGP
@@ -153,7 +168,7 @@ nnpql <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
       if(!any(covs_homo)){
         res <- tryCatch({
           Ks <- list(K[idx_keep, idx_keep], diag(length(idx_keep)))
-          run_nnpql(Y[idx_keep, i], Wx, Ks, init_alpha_beta, model, maxIter, 
+          run_pql(Y[idx_keep, i], Wx, Ks, init_alpha_beta, model, maxIter, 
             tol, lib_size[idx_keep, i], nngp, nn_mtx, fix_h2eq1, verbose)
         }, error = function(e){
           print(e)

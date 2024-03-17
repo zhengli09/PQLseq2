@@ -1,6 +1,6 @@
 // Author: Zheng Li
 // Date: 2023-07-28
-// Poisson/Binomial mixed model using nearest neighbor Gaussian process
+// A faster re-implementation of the Poisson/Binomial mixed model
 
 #include <RcppArmadillo.h>
 #include <float.h>
@@ -420,7 +420,7 @@ public:
 
 
 // [[Rcpp::export]]
-List run_nnpql(const arma::vec &y, const arma::mat &X, 
+List run_pql(const arma::vec &y, const arma::mat &X, 
   const arma::field<arma::mat> &Ks, const arma::vec &init_alpha_beta, 
   const std::string model, const int maxIter, const double tol, 
   const arma::vec &lib_size, const bool nngp, const arma::sp_mat &nn_mtx, 

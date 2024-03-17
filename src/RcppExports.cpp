@@ -11,9 +11,9 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// run_nnpql
-List run_nnpql(const arma::vec& y, const arma::mat& X, const arma::field<arma::mat>& Ks, const arma::vec& init_alpha_beta, const std::string model, const int maxIter, const double tol, const arma::vec& lib_size, const bool nngp, const arma::sp_mat& nn_mtx, const bool fix_h2eq1, const bool verbose);
-RcppExport SEXP _nnPQL_run_nnpql(SEXP ySEXP, SEXP XSEXP, SEXP KsSEXP, SEXP init_alpha_betaSEXP, SEXP modelSEXP, SEXP maxIterSEXP, SEXP tolSEXP, SEXP lib_sizeSEXP, SEXP nngpSEXP, SEXP nn_mtxSEXP, SEXP fix_h2eq1SEXP, SEXP verboseSEXP) {
+// run_pql
+List run_pql(const arma::vec& y, const arma::mat& X, const arma::field<arma::mat>& Ks, const arma::vec& init_alpha_beta, const std::string model, const int maxIter, const double tol, const arma::vec& lib_size, const bool nngp, const arma::sp_mat& nn_mtx, const bool fix_h2eq1, const bool verbose);
+RcppExport SEXP _PQLseq2_run_pql(SEXP ySEXP, SEXP XSEXP, SEXP KsSEXP, SEXP init_alpha_betaSEXP, SEXP modelSEXP, SEXP maxIterSEXP, SEXP tolSEXP, SEXP lib_sizeSEXP, SEXP nngpSEXP, SEXP nn_mtxSEXP, SEXP fix_h2eq1SEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -29,17 +29,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::sp_mat& >::type nn_mtx(nn_mtxSEXP);
     Rcpp::traits::input_parameter< const bool >::type fix_h2eq1(fix_h2eq1SEXP);
     Rcpp::traits::input_parameter< const bool >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(run_nnpql(y, X, Ks, init_alpha_beta, model, maxIter, tol, lib_size, nngp, nn_mtx, fix_h2eq1, verbose));
+    rcpp_result_gen = Rcpp::wrap(run_pql(y, X, Ks, init_alpha_beta, model, maxIter, tol, lib_size, nngp, nn_mtx, fix_h2eq1, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_nnPQL_run_nnpql", (DL_FUNC) &_nnPQL_run_nnpql, 12},
+    {"_PQLseq2_run_pql", (DL_FUNC) &_PQLseq2_run_pql, 12},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_nnPQL(DllInfo *dll) {
+RcppExport void R_init_PQLseq2(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

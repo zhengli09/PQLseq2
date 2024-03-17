@@ -1,3 +1,4 @@
-useDynLib(nnPQL, .registration=TRUE)
+useDynLib(PQLseq2, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
-export(nnpql)
+export(pqlseq2)
+export(run_pql)

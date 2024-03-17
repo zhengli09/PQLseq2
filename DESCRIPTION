@@ -1,7 +1,7 @@
 Type: Package
-Package: nnPQL
+Package: PQLseq2
 Title: Poisson and Binomial linear mixed model
-Version: 0.1.0
+Version: 2.0.0
 Date: 2023-07-28
 Author: Zheng Li, Xiang Zhou
 Maintainer: Zheng Li <zlisph@umich.edu>

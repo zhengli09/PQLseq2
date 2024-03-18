@@ -126,8 +126,8 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
   }
 
   # 6.run algorithm
-  header <- c("outcome", "n", "beta", "se_beta", "pvalue", "h2", "sigma2",
-    "converged", "elapsed_time")
+  header <- c("outcome", "n", "intercept", "se_intercept", "beta", "se_beta", 
+    "pvalue", "h2", "sigma2", "converged", "elapsed_time")
   if(!is.null(outfile)){
     write.table(t(header), file = outfile, col.names = F, row.names = F,
       quote = F, sep = ',')
@@ -200,7 +200,7 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
               u = res$u)
           }
         } else{
-          ests <- c(colnames(Y)[i], rep(NA, 8))
+          ests <- c(colnames(Y)[i], rep(NA, 10))
           ests <- data.frame(t(ests))
           colnames(ests) <- header
           others <- list()
@@ -220,6 +220,11 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
       return(output)
     }, mc.cores = ncores)
     
+    if(!is.null(names(res))){
+      if(names(res)[2] == "warning"){
+        res <- res[["value"]]
+      }
+    }
     if(verbose){
       res_ests <- do.call(rbind, lapply(res, `[[`, "estimates"))
       res_othrs <- lapply(res, `[[`, "others")

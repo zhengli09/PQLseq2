@@ -381,6 +381,7 @@ public:
         _["intercept"] = paras.alpha_beta(0),
         _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
         _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
+        _["se_alpha"] = sqrt(diagvec(alg.XtHinvX_inv.submat(1,1,dat.c,dat.c))),
         _["beta"] = paras.alpha_beta.tail(1),
         _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
         _["converged"] = control.is_converged,

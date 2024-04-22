@@ -369,6 +369,10 @@ public:
   {
     List output;
     vec u = alg.eta - dat.X * paras.alpha_beta;
+    double LL = -(accu(log(alg.d * alg.d)) + log_det_sympd(alg.H) +
+      log_det_sympd(alg.XtHinvX) + as_scalar(alg.y_tilde.t() * alg.P * 
+      alg.y_tilde)) * 0.5;
+    double AIC = -2 * LL + 2 * (dat.c + 2 + control.est_idx.n_elem);
     if(verbose)
     {
       output = List::create(
@@ -381,7 +385,7 @@ public:
         _["intercept"] = paras.alpha_beta(0),
         _["se_intercept"] = sqrt(alg.XtHinvX_inv(0, 0)),
         _["alpha"] = paras.alpha_beta.subvec(0, dat.c),
-        _["se_alpha"] = sqrt(diagvec(alg.XtHinvX_inv.submat(1,1,dat.c,dat.c))),
+        _["se_alpha"] = sqrt(diagvec(alg.XtHinvX_inv.submat(0,0,dat.c,dat.c))),
         _["beta"] = paras.alpha_beta.tail(1),
         _["se_beta"] = sqrt(alg.XtHinvX_inv(dat.c+1, dat.c+1)),
         _["converged"] = control.is_converged,
@@ -392,7 +396,9 @@ public:
         _["H"] = alg.H,
         _["P"] = alg.P,
         _["cov"] = alg.XtHinvX_inv,
-        _["d"] = alg.d
+        _["d"] = alg.d,
+        _["LL"] = LL,
+        _["AIC"] = AIC
       );
     }
     else

@@ -197,7 +197,8 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
               res = Y[idx_keep, i] - res$mu, converged = res$converged, X = Wx, 
               K = K, V = res$tau1 * Ks[[1]] + res$tau2 * Ks[[2]], 
               D = diag(res$d[, 1]), family = mod0$family, 
-              numTotal = lib_size[idx_keep, i], u = res$u)
+              numTotal = lib_size[idx_keep, i], u = res$u, LL = res$LL, 
+              AIC = res$AIC)
           }
         } else{
           ests <- c(colnames(Y)[i], rep(NA, 10))

@@ -178,7 +178,7 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
         # organized results into an output object
         if(is.list(res)){
           beta <- res$beta
-          se_beta <- res$se_beta
+          se_beta <- sqrt(res$cov[nrow(res$cov), nrow(res$cov)])
           pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
           
           ests <- data.frame(outcome = colnames(Y)[i], n = res$n, 

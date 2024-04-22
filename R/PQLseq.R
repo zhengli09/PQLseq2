@@ -178,14 +178,20 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
         # organized results into an output object
         if(is.list(res)){
           beta <- res$beta
-          se_beta <- sqrt(res$cov[nrow(res$cov), nrow(res$cov)])
+          if(verbose){
+            se_beta <- sqrt(res$cov[nrow(res$cov), nrow(res$cov)])
+            se_intercept <- sqrt(res$cov[1, 1])
+          } else{
+            se_beta <- res$se_beta
+            se_intercept <- res$se_intercept
+          }
           pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
           
           ests <- data.frame(outcome = colnames(Y)[i], n = res$n, 
-            intercept = res$intercept, se_intercept = sqrt(res$cov[1, 1]),
-            beta = beta, se_beta = sqrt(res$cov[nrow(res$cov), nrow(res$cov)]), 
-            pvalue = pvalue, h2 = res$h2, sigma2 = res$sigma2, 
-            converged = res$converged, elapsed_time = res$elapsed_time)
+            intercept = res$intercept, se_intercept = se_intercept,
+            beta = beta, se_beta = se_beta, pvalue = pvalue, h2 = res$h2, 
+            sigma2 = res$sigma2, converged = res$converged, 
+            elapsed_time = res$elapsed_time)
           if(verbose){
             others <- list(taus = res$taus, P = res$P, cov = res$cov, 
               alpha = res$alpha, se_alpha = sqrt(diag(res$cov))[-nrow(res$cov)], 

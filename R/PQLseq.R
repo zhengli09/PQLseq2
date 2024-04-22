@@ -188,17 +188,17 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
             elapsed_time = res$elapsed_time)
           if(verbose){
             others <- list(taus = res$taus, P = res$P, cov = res$cov, 
-              alpha = res$alpha, se_alpha = res$se_alpha, eta = res$eta, 
-              H = res$H, intercept = res$intercept, 
-              se_intercept = res$se_intercept, beta = res$beta, 
-              se_beta = res$se_beta, pvalue = pvalue, tau1 = res$tau1, 
-              tau2 = res$tau2, sigma2 = res$sigma2, h2 = res$h2, 
-              iter = res$niter, mu = res$mu, Y = Y, y = Y[idx_keep, i], 
-              res = Y[idx_keep, i] - res$mu, converged = res$converged, X = Wx, 
-              K = K, V = res$tau1 * Ks[[1]] + res$tau2 * Ks[[2]], 
-              D = diag(res$d[, 1]), family = mod0$family, 
-              numTotal = lib_size[idx_keep, i], u = res$u, LL = res$LL, 
-              AIC = res$AIC)
+              alpha = res$alpha, se_alpha = sqrt(diag(res$cov))[-nrow(res$cov)], 
+              eta = res$eta, H = res$H, intercept = res$intercept, 
+              se_intercept = sqrt(res$cov[1,1]), beta = res$beta, 
+              se_beta = sqrt(res$cov[nrow(res$cov), nrow(res$cov)]),
+              pvalue = pvalue, tau1 = res$tau1, tau2 = res$tau2, 
+              sigma2 = res$sigma2, h2 = res$h2, iter = res$niter, mu = res$mu, 
+              Y = Y, y = Y[idx_keep, i], res = Y[idx_keep, i] - res$mu, 
+              converged = res$converged, X = Wx, K = K, 
+              V = res$tau1 * Ks[[1]] + res$tau2 * Ks[[2]], D = diag(res$d[, 1]), 
+              family = mod0$family, numTotal = lib_size[idx_keep, i], u = res$u, 
+              LL = res$LL, AIC = res$AIC)
           }
         } else{
           ests <- c(colnames(Y)[i], rep(NA, 10))

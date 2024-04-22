@@ -369,7 +369,7 @@ public:
   {
     List output;
     vec u = alg.eta - dat.X * paras.alpha_beta;
-    double LL = -(accu(log(alg.d * alg.d)) + log_det_sympd(alg.H) +
+    double LL = -(accu(log(alg.d % alg.d)) + log_det_sympd(alg.H) +
       log_det_sympd(alg.XtHinvX) + as_scalar(alg.y_tilde.t() * alg.P * 
       alg.y_tilde)) * 0.5;
     double AIC = -2 * LL + 2 * (dat.c + 2 + control.est_idx.n_elem);

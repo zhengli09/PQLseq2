@@ -103,7 +103,7 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
     if(any(eigvals < 1e-10)){ 
       warning(paste("K is singular, approximate K with its",
         "nearest positive definite matrix"))
-      K <- as.matrix(Matrix::nearPD(K, doSym = TRUE)$mat)	
+      K <- as.matrix(Matrix::nearPD(K, doSym = TRUE, corr = TRUE)$mat)	
     } 
   }
   

@@ -143,7 +143,7 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
       p_succ <- Y[, i] / lib_size[, i]
       mod0_formula <- "p_succ ~ x"
       if(c != 0){
-        mod0_formula <- paste(mod0_formula, "+ W")
+        mod0_formula <- "p_succ ~ W + x"
       }
       # fit model under g = e = 0 to obtain initials 
       mod0 <- glm(as.formula(mod0_formula), family = binomial(link = "logit"),

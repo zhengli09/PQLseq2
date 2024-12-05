@@ -341,19 +341,12 @@ public:
         cout << "Iter: " << iter + 1 << endl;
       }
       update_H(control.nngp);
-      record_time(0);
       update_P();
-      record_time(1);
       update_alpha_beta();
-      record_time(2);
       update_eta();
-      record_time(3);
       update_taus();
-      record_time(4);
       update_d();
-      record_time(5);
       update_y_tilde();
-      record_time(6);
       check_converge();
       check_anomaly();
       if(control.is_converged || control.is_failed)

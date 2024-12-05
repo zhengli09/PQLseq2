@@ -187,6 +187,11 @@ pqlseq2 <- function(Y, x, K, W = NULL, lib_size = NULL, model = c("PMM", "BMM"),
           }
           pvalue <- pchisq((beta / se_beta)^2, df = 1, lower.tail = F)
           
+          # handle cases when both variance components are zeros
+          if(fix_h2eq1 & all(res$taus == 0)){
+            res$h2 <- 1
+          }
+          
           ests <- data.frame(outcome = colnames(Y)[i], n = res$n, 
             intercept = res$intercept, se_intercept = se_intercept,
             beta = beta, se_beta = se_beta, pvalue = pvalue, h2 = res$h2, 
